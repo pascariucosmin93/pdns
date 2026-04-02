@@ -1,0 +1,17 @@
+$TTL 3600
+@   IN SOA  ns1.portfolio.test. hostmaster.portfolio.test. (
+        2026040301
+        10800
+        3600
+        604800
+        3600
+)
+
+@         IN NS     ns1.portfolio.test.
+ns1       IN A      172.30.0.10
+dns       IN A      172.30.0.10
+git       IN A      172.30.0.21
+grafana   IN A      172.30.0.22
+wiki      IN A      172.30.0.23
+www       IN CNAME  wiki.portfolio.test.
+
