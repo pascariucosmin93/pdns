@@ -1,83 +1,117 @@
-# PDNS Portfolio Project
+# PDNS — Local DNS Server with Internet Routing
 
-A portfolio-ready DNS project built with PowerDNS Authoritative and PowerDNS Recursor.
+A bare-metal PowerDNS setup that acts as both a **local DNS server** and a **full internet resolver**.
 
-## Overview
+- `cosmin-lab.com` subdomains resolve to your local services
+- Everything else (google.com, sql.com, etc.) resolves normally via the internet
 
-This repository demonstrates a clean DNS architecture with separated roles:
+No Docker. No containers. Runs directly on the system.
 
-- `PowerDNS Authoritative` serves a private zone named `portfolio.test`
-- `PowerDNS Recursor` handles recursive queries and forwards the local zone upstream
-- `Podman Compose` wires both services together using a dedicated bridge network and static IPs
+## How It Works
 
-The project is intentionally designed to be easy to present in an interview or portfolio review. It highlights DNS concepts, container networking, service separation, and infrastructure-as-code style configuration.
+```
+DNS client
+    │
+    ▼  port 53
+PowerDNS Recursor
+    ├── *.cosmin-lab.com  ──► PowerDNS Authoritative (127.0.0.1:5300)
+    │                              └── /etc/powerdns/zones/db.cosmin-lab.com
+    │
+    └── everything else  ──► Internet (8.8.8.8 / 1.1.1.1)
+```
 
-## Architecture
+The **Recursor** is the single entry point on port 53. It routes queries:
+- Local domain → your own authoritative server
+- Internet domain → upstream resolvers (full recursion or forwarded)
 
-See `docs/architecture.md`.
+## Quick Start
+
+```bash
+# Default: domain = cosmin-lab.com, server IP = auto-detected
+sudo bash install.sh
+
+# Custom domain or IP
+LOCAL_DOMAIN=mylab.com SERVER_IP=192.168.1.10 sudo bash install.sh
+```
+
+The script handles:
+- Package installation (from official PowerDNS repos)
+- Port-53 conflict with `systemd-resolved` (disabled automatically)
+- All configuration files
+- Service startup and a quick smoke test
+
+Supported distros: **Ubuntu 20.04+**, **Debian 11+**, **Rocky / AlmaLinux / CentOS 8+**
+
+## Test It
+
+```bash
+# Local record — should return your server IP
+dig sql.cosmin-lab.com
+
+# Internet — should return real IPs
+dig google.com
+dig sql.com
+
+# Direct query to authoritative (bypasses recursor)
+dig @127.0.0.1 -p 5300 sql.cosmin-lab.com
+```
+
+## Add a Local Record
+
+1. Edit the zone file:
+   ```bash
+   sudo nano /etc/powerdns/zones/db.cosmin-lab.com
+   ```
+2. Add your record (example):
+   ```
+   myapp   IN A   192.168.1.20
+   ```
+3. Increment the serial number on the SOA line (`2026040301` → `2026040302`)
+4. Reload without restarting:
+   ```bash
+   pdns_control bind-reload-now cosmin-lab.com
+   ```
 
 ## Repository Structure
 
-- `compose.yaml` defines the full stack
-- `configs/authoritative/pdns.conf` configures the authoritative server
-- `configs/authoritative/named.conf` registers the local zone
-- `configs/recursor/recursor.conf` configures forwarding behavior
-- `zones/db.portfolio.test` stores the sample DNS records
-- `scripts/validate.ps1` performs lightweight configuration validation
-- `scripts/validate.sh` provides the same validation flow for Unix-like environments
+```
+install.sh                          — main install script (run this)
+configs/authoritative/pdns.conf     — authoritative server config (reference)
+configs/authoritative/named.conf    — zone registration (reference)
+configs/recursor/recursor.conf      — recursor forwarding config (reference)
+zones/db.portfolio.test             — example zone file (reference)
+docs/architecture.md                — architecture diagram
+```
+
+> The `configs/` and `zones/` directories are reference copies.
+> The live configuration is written to `/etc/powerdns/` by `install.sh`.
 
 ## Key Design Decisions
 
-- non-privileged internal ports avoid the need for extra capabilities in containers
-- static container IPs make the forwarding path deterministic and easier to explain
-- BIND backend keeps the zone definition transparent and version-control friendly
-- API exposure on port `8081` leaves room for future automation or UI integration
+- **No containers** — runs directly on the OS, simpler to debug and present
+- **Port-53 conflict solved** — `systemd-resolved` stub listener is disabled automatically
+- **Split routing** — local zone served authoritatively, internet queries recurse normally
+- **BIND backend** — zone files are plain text, version-control friendly
+- **Loopback-only auth** — authoritative listens on `127.0.0.1:5300`, not exposed externally
 
-## Local Development
-
-Render the final Compose configuration:
-
-```powershell
-podman compose -f .\compose.yaml config
-```
-
-Run the lightweight validation script:
-
-```powershell
-.\scripts\validate.ps1
-```
-
-Or on Linux/macOS:
+## Service Management
 
 ```bash
-./scripts/validate.sh
-```
+# Status
+systemctl status pdns
+systemctl status pdns-recursor
 
-If you want to start the stack locally later:
+# Logs
+journalctl -u pdns -f
+journalctl -u pdns-recursor -f
 
-```powershell
-podman compose -f .\compose.yaml up -d
-```
-
-## Demo Queries
-
-Query the recursor:
-
-```powershell
-dig @127.0.0.1 -p 1053 wiki.portfolio.test
-dig @127.0.0.1 -p 1053 grafana.portfolio.test
-```
-
-Query the authoritative server directly:
-
-```powershell
-dig @127.0.0.1 -p 5300 portfolio.test SOA
-dig @127.0.0.1 -p 5300 www.portfolio.test
+# Restart
+sudo systemctl restart pdns pdns-recursor
 ```
 
 ## Next Improvements
 
-- add CI validation for Compose and zone file linting
-- introduce DNSSEC for the authoritative zone
-- replace static records with a database backend and API-driven record management
-- add metrics export and dashboarding for observability
+- DNSSEC for the local zone
+- Database backend (SQLite / PostgreSQL) for API-driven record management
+- GitHub Actions CI for zone file linting
+- Prometheus metrics + Grafana dashboard
