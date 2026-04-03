@@ -72,7 +72,8 @@ bump_serial() {
 backup_zone() {
     local backup_dir="/var/backups/pdns"
     install -d "${backup_dir}"
-    local backup_file="${backup_dir}/$(date +%Y%m%d_%H%M%S)_${LOCAL_DOMAIN}.zone"
+    local backup_file
+    backup_file="${backup_dir}/$(date +%Y%m%d_%H%M%S)_${LOCAL_DOMAIN}.zone"
     cp "${ZONE_FILE}" "${backup_file}"
     info "Backup saved: ${backup_file}"
 

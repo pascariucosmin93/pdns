@@ -48,7 +48,6 @@ detect_os() {
     if [[ -f /etc/os-release ]]; then
         . /etc/os-release
         OS_ID="${ID}"
-        OS_VER="${VERSION_ID%%.*}"
     else
         err "Cannot detect OS. /etc/os-release not found."
     fi

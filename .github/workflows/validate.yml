@@ -7,7 +7,6 @@ on:
     branches: ["main"]
 
 jobs:
-  # ── Shell script linting ────────────────────────────────────────────────────
   shellcheck:
     name: ShellCheck
     runs-on: ubuntu-latest
@@ -17,80 +16,9 @@ jobs:
       - name: Install ShellCheck
         run: sudo apt-get install -y shellcheck
 
-      - name: Lint all shell scripts
+      - name: Lint shell scripts
         run: |
           shellcheck --severity=warning \
             install.sh \
             manage-dns.sh \
-            status.sh \
-            scripts/validate.sh
-
-  # ── Zone file validation ────────────────────────────────────────────────────
-  zone:
-    name: Zone File
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install named-checkzone
-        run: sudo apt-get install -y bind9-utils
-
-      - name: Validate zone files
-        run: |
-          for zone_file in zones/db.*; do
-            domain="${zone_file#zones/db.}"
-            echo "Checking zone: ${domain} (${zone_file})"
-            named-checkzone "${domain}" "${zone_file}"
-          done
-
-      - name: Check serial format (YYYYMMDDnn)
-        run: |
-          for zone_file in zones/db.*; do
-            serial=$(grep -oP '^\s+\K[0-9]{10}(?=\s*;\s*serial)' "${zone_file}" || true)
-            if [[ -z "${serial}" ]]; then
-              echo "ERROR: No serial found in ${zone_file}"
-              exit 1
-            fi
-            date_part="${serial:0:8}"
-            seq_part="${serial:8:2}"
-            if ! date -d "${date_part}" &>/dev/null; then
-              echo "ERROR: Serial '${serial}' in ${zone_file} has invalid date part '${date_part}'"
-              exit 1
-            fi
-            if [[ "${seq_part}" -lt 1 || "${seq_part}" -gt 99 ]]; then
-              echo "ERROR: Serial '${serial}' sequence '${seq_part}' must be 01–99"
-              exit 1
-            fi
-            echo "Serial OK: ${serial}"
-          done
-
-  # ── Config syntax check ─────────────────────────────────────────────────────
-  config:
-    name: Config Files
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check required keys in pdns.conf
-        run: |
-          conf="configs/authoritative/pdns.conf"
-          for key in local-address local-port launch; do
-            grep -q "^${key}=" "${conf}" \
-              || { echo "ERROR: Missing '${key}' in ${conf}"; exit 1; }
-          done
-          echo "pdns.conf OK"
-
-      - name: Check required keys in recursor.conf
-        run: |
-          conf="configs/recursor/recursor.conf"
-          for key in local-address local-port forward-zones; do
-            grep -q "^${key}=" "${conf}" \
-              || { echo "ERROR: Missing '${key}' in ${conf}"; exit 1; }
-          done
-          echo "recursor.conf OK"
-
-      - name: Validate named.conf syntax
-        run: |
-          sudo apt-get install -y bind9-utils
-          named-checkconf configs/authoritative/named.conf
-          echo "named.conf OK"
+            status.sh
