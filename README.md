@@ -75,16 +75,12 @@ dig @127.0.0.1 -p 5300 sql.cosmin-lab.com
 ## Repository Structure
 
 ```
-install.sh                          — main install script (run this)
-configs/authoritative/pdns.conf     — authoritative server config (reference)
-configs/authoritative/named.conf    — zone registration (reference)
-configs/recursor/recursor.conf      — recursor forwarding config (reference)
-zones/db.portfolio.test             — example zone file (reference)
-docs/architecture.md                — architecture diagram
+install.sh      — installs and configures PowerDNS on the system
+manage-dns.sh   — add, remove, restore DNS records
+status.sh       — live health dashboard
 ```
 
-> The `configs/` and `zones/` directories are reference copies.
-> The live configuration is written to `/etc/powerdns/` by `install.sh`.
+All live configuration is written to `/etc/powerdns/` by `install.sh`.
 
 ## Key Design Decisions
 
